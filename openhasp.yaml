@@ -1,0 +1,224 @@
+plate:
+  objects:
+    - obj: "p1b38" # current time
+      properties:
+        "text_font": 23
+        "text": '{{ now().strftime("%H:%M") }}'
+
+    - obj: "p1b39" # HA connection/status
+      properties:
+        "text": "HA: Online"
+        "text_color": "#FFFFFF"
+
+    - obj: "p1b46" # pump alert enabled state
+      properties:
+        "text": >
+          Alert: {{ "ON" if is_state("input_boolean.pump_runtime_alert_enabled", "on") else "OFF" }}
+        "text_color": '{{ "#2F9E44" if is_state("input_boolean.pump_runtime_alert_enabled", "on") else "#C92A2A" }}'
+
+    - obj: "p1b30" # soil temperature
+      properties:
+        "text_font": 23
+        "text": >
+          {% set ids = ["sensor.kc868_a8s_soil_temperature", "sensor.soil_temperature"] %}
+          {% set ns = namespace(v="--") %}
+          {% for e in ids %}
+            {% if ns.v == "--" and states(e) not in ["unknown", "unavailable", "none"] %}
+              {% set ns.v = states(e) %}
+            {% endif %}
+          {% endfor %}
+          Soil Temp: {{ "--" if ns.v == "--" else "%.2f" | format(ns.v | float) }} C
+
+    - obj: "p1b31" # soil moisture
+      properties:
+        "text_font": 23
+        "text": >
+          {% set ids = ["sensor.kc868_a8s_soil_moisture", "sensor.soil_moisture"] %}
+          {% set ns = namespace(v="--") %}
+          {% for e in ids %}
+            {% if ns.v == "--" and states(e) not in ["unknown", "unavailable", "none"] %}
+              {% set ns.v = states(e) %}
+            {% endif %}
+          {% endfor %}
+          Soil Moist: {{ "--" if ns.v == "--" else "%.2f" | format(ns.v | float) }} %
+
+    - obj: "p1b32" # soil EC
+      properties:
+        "text_font": 23
+        "text": >
+          {% set ids = ["sensor.kc868_a8s_soil_ec", "sensor.soil_ec"] %}
+          {% set ns = namespace(v="--") %}
+          {% for e in ids %}
+            {% if ns.v == "--" and states(e) not in ["unknown", "unavailable", "none"] %}
+              {% set ns.v = states(e) %}
+            {% endif %}
+          {% endfor %}
+          Soil EC: {{ "--" if ns.v == "--" else "%.2f" | format(ns.v | float) }}
+
+    - obj: "p1b33" # representative air temperature
+      properties:
+        "text_font": 23
+        "text": >
+          {% set v = states("sensor.representative_air_temperature") %}
+          Air Temp: {{ "--" if v in ["unknown", "unavailable", "none"] else "%.2f" | format(v | float) }} C
+
+    - obj: "p1b37" # representative air humidity
+      properties:
+        "text_font": 23
+        "text": >
+          {% set v = states("sensor.representative_air_humidity") %}
+          Air Hum: {{ "--" if v in ["unknown", "unavailable", "none"] else "%.2f" | format(v | float) }} %
+
+    - obj: "p1b34" # pump timer remaining
+      properties:
+        "text_font": 23
+        "text": 'Pump Time: {{ states("sensor.pump_timer_remaining") }}'
+
+    - obj: "p1b35" # status message
+      properties:
+        "text": >
+          {% set ids = ["switch.kc868_a8s_a8s_out_5", "switch.a8s_out_5"] %}
+          {% set ns = namespace(on=false) %}
+          {% for e in ids %}
+            {% if is_state(e, "on") %}
+              {% set ns.on = true %}
+            {% endif %}
+          {% endfor %}
+          {% if ns.on %}
+          Pump Running
+          {% else %}
+          System Ready
+          {% endif %}
+
+    - obj: "p1b11" # left window open, ESPHome relay 1
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_1", "on") or is_state("switch.a8s_out_1", "on") else 0 }}'
+        "text": "OPEN"
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_1", "on") or is_state("switch.a8s_out_1", "on") else "#1F7A8C" }}'
+      event:
+        "up":
+          - service: script.left_window_open
+
+    - obj: "p1b12" # left window close, ESPHome relay 2
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_2", "on") or is_state("switch.a8s_out_2", "on") else 0 }}'
+        "text": "CLOSE"
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#7F1D1D" if is_state("switch.kc868_a8s_a8s_out_2", "on") or is_state("switch.a8s_out_2", "on") else "#B7791F" }}'
+        "bg_grad_color": '{{ "#7F1D1D" if is_state("switch.kc868_a8s_a8s_out_2", "on") or is_state("switch.a8s_out_2", "on") else "#B7791F" }}'
+      event:
+        "up":
+          - service: script.left_window_close
+
+    - obj: "p1b13" # right window open, ESPHome relay 3
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_3", "on") or is_state("switch.a8s_out_3", "on") else 0 }}'
+        "text": "OPEN"
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_3", "on") or is_state("switch.a8s_out_3", "on") else "#1F7A8C" }}'
+      event:
+        "up":
+          - service: script.right_window_open
+
+    - obj: "p1b14" # right window close, ESPHome relay 4
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_4", "on") or is_state("switch.a8s_out_4", "on") else 0 }}'
+        "text": "CLOSE"
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#7F1D1D" if is_state("switch.kc868_a8s_a8s_out_4", "on") or is_state("switch.a8s_out_4", "on") else "#B7791F" }}'
+        "bg_grad_color": '{{ "#7F1D1D" if is_state("switch.kc868_a8s_a8s_out_4", "on") or is_state("switch.a8s_out_4", "on") else "#B7791F" }}'
+      event:
+        "up":
+          - service: script.right_window_close
+
+    - obj: "p1b36" # pump timer set value
+      properties:
+        "text": 'Timer: {{ states("input_number.pump_timer_minutes") | float(1) | int }} min'
+
+    - obj: "p1b17" # pump timer slider, 1-120 minutes
+      properties:
+        "val": '{{ states("input_number.pump_timer_minutes") | float(1) | int }}'
+      event:
+        "changed":
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.pump_timer_minutes
+            data:
+              value: >
+                {% set raw = val | float(1) | int %}
+                {% if raw < 1 %}1{% elif raw > 120 %}120{% else %}{{ raw }}{% endif %}
+        "up":
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.pump_timer_minutes
+            data:
+              value: >
+                {% set raw = val | float(1) | int %}
+                {% if raw < 1 %}1{% elif raw > 120 %}120{% else %}{{ raw }}{% endif %}
+
+    - obj: "p1b15" # pump timer start
+      properties:
+        "val": '{{ 1 if is_state("timer.pump_timer", "active") else 0 }}'
+        "text": "START"
+        "text_font": 20
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("timer.pump_timer", "active") else "#1F7A8C" }}'
+        "bg_grad_color": '{{ "#2F9E44" if is_state("timer.pump_timer", "active") else "#1F7A8C" }}'
+      event:
+        "up":
+          - service: script.pump_timer_start
+
+    - obj: "p1b16" # pump timer stop
+      properties:
+        "val": 0
+        "text": "STOP"
+        "text_font": 20
+        "text_color": "#FFFFFF"
+        "bg_color": "#627D98"
+        "bg_grad_color": "#627D98"
+      event:
+        "up":
+          - service: script.pump_timer_stop
+
+    - obj: "p1b18" # remote site control, ESPHome relay 6
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_6", "on") or is_state("switch.a8s_out_6", "on") else 0 }}'
+        "text": "REMOTE"
+        "text_font": 15
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_6", "on") or is_state("switch.a8s_out_6", "on") else "#627D98" }}'
+        "bg_grad_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_6", "on") or is_state("switch.a8s_out_6", "on") else "#627D98" }}'
+      event:
+        "up":
+          - service: switch.toggle
+            target:
+              entity_id: switch.kc868_a8s_a8s_out_6
+
+    - obj: "p1b19" # fan control, ESPHome relay 7
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_7", "on") or is_state("switch.a8s_out_7", "on") else 0 }}'
+        "text": "FAN"
+        "text_font": 17
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_7", "on") or is_state("switch.a8s_out_7", "on") else "#627D98" }}'
+        "bg_grad_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_7", "on") or is_state("switch.a8s_out_7", "on") else "#627D98" }}'
+      event:
+        "up":
+          - service: switch.toggle
+            target:
+              entity_id: switch.kc868_a8s_a8s_out_7
+
+    - obj: "p1b20" # light control, ESPHome relay 8
+      properties:
+        "val": '{{ 1 if is_state("switch.kc868_a8s_a8s_out_8", "on") or is_state("switch.a8s_out_8", "on") else 0 }}'
+        "text": "LIGHT"
+        "text_font": 17
+        "text_color": "#FFFFFF"
+        "bg_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_8", "on") or is_state("switch.a8s_out_8", "on") else "#627D98" }}'
+        "bg_grad_color": '{{ "#2F9E44" if is_state("switch.kc868_a8s_a8s_out_8", "on") or is_state("switch.a8s_out_8", "on") else "#627D98" }}'
+      event:
+        "up":
+          - service: switch.toggle
+            target:
+              entity_id: switch.kc868_a8s_a8s_out_8
