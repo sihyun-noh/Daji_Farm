@@ -29,3 +29,17 @@ __pycache__/
 esphome/.esphome/
 esphome/**/.pioenvs/
 esphome/**/.piolibdeps/
+
+# Home Assistant generated
+.HA_VERSION
+.cache/
+.ha_run.lock
+
+# HACS / custom integrations
+custom_components/
+
+# go2rtc binary
+go2rtc-*
+
+# snapshots / generated images
+www/snapshots/
