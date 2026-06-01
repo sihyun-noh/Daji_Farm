@@ -1,0 +1,601 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+#automation: !include automations.yaml
+#script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# include
+openhasp: !include openhasp.yaml
+
+homeassistant:
+  packages:
+    mqtt_publish: !include mqtt_publish.yaml
+    daily_snapshot: !include daily_snapshot.yaml
+
+# Smart farm helper values.
+# pump_timer_minutes is used for manual watering and scheduled watering.
+# irrigation_*_duration_minutes stores each schedule's watering duration.
+input_number:
+  pump_timer_minutes:
+    name: Pump Timer Minutes
+    min: 1
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+    icon: mdi:timer-outline
+
+  irrigation_1_duration_minutes:
+    name: 예약 1 관수 시간
+    min: 1
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+    icon: mdi:timer
+
+  irrigation_2_duration_minutes:
+    name: 예약 2 관수 시간
+    min: 1
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+    icon: mdi:timer
+
+  irrigation_3_duration_minutes:
+    name: 예약 3 관수 시간
+    min: 1
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+    icon: mdi:timer
+
+  irrigation_4_duration_minutes:
+    name: 예약 4 관수 시간
+    min: 1
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+    icon: mdi:timer
+
+# Enable/disable switches for scheduled watering 1~4.
+input_boolean:
+  pump_runtime_alert_enabled:
+    name: 펌프 동작 알림 사용
+    icon: mdi:bell-ring
+    initial: true
+
+  irrigation_1_schedule_enabled:
+    name: 예약 1 사용
+    icon: mdi:calendar-clock
+
+  irrigation_2_schedule_enabled:
+    name: 예약 2 사용
+    icon: mdi:calendar-clock
+
+  irrigation_3_schedule_enabled:
+    name: 예약 3 사용
+    icon: mdi:calendar-clock
+
+  irrigation_4_schedule_enabled:
+    name: 예약 4 사용
+    icon: mdi:calendar-clock
+
+# Start time for each scheduled watering slot.
+input_datetime:
+  irrigation_1_start_time:
+    name: 예약 1 시작 시간
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+
+  irrigation_2_start_time:
+    name: 예약 2 시작 시간
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+
+  irrigation_3_start_time:
+    name: 예약 3 시작 시간
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+
+  irrigation_4_start_time:
+    name: 예약 4 시작 시간
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+
+# Dashboard tab state helpers.
+# environment_graph_tab switches air/soil graph cards.
+# irrigation_schedule_tab switches scheduled watering 1~4 cards.
+# representative_air_sensor selects which air temperature/humidity pair is shown.
+input_select:
+  representative_air_sensor:
+    name: 대표 온습도 센서 선택
+    options:
+      - Auto
+      - Autonics
+      - CWT
+    initial: Auto
+    icon: mdi:thermometer-lines
+
+  environment_graph_tab:
+    name: 환경 그래프 탭
+    options:
+      - 공기
+      - 토양
+    initial: 공기
+    icon: mdi:chart-line
+
+  irrigation_schedule_tab:
+    name: 예약 관수 탭
+    options:
+      - 예약 1
+      - 예약 2
+      - 예약 3
+      - 예약 4
+    initial: 예약 1
+    icon: mdi:calendar-clock
+
+# Actual pump countdown timer.
+timer:
+  pump_timer:
+    name: Pump Timer
+    restore: true
+
+# Pump runtime history sensors.
+# Values are in hours and are calculated from relay 5 ON time.
+sensor:
+  - platform: history_stats
+    name: Pump Runtime Today
+    entity_id: switch.kc868_a8s_a8s_out_5
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00') }}"
+    end: "{{ now() }}"
+    state_class: total_increasing
+
+  - platform: history_stats
+    name: Pump Runtime This Week
+    entity_id: switch.kc868_a8s_a8s_out_5
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00') - timedelta(days=now().weekday()) }}"
+    end: "{{ now() }}"
+    state_class: total_increasing
+
+  - platform: history_stats
+    name: Pump Runtime Last 15 Days
+    entity_id: switch.kc868_a8s_a8s_out_5
+    state: "on"
+    type: time
+    end: "{{ now() }}"
+    duration:
+      days: 15
+
+  - platform: history_stats
+    name: Pump Runtime This Month
+    entity_id: switch.kc868_a8s_a8s_out_5
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00').replace(day=1) }}"
+    end: "{{ now() }}"
+    state_class: total_increasing
+
+# Pump and window control scripts.
+# Relay 5 is used as pump ON/OFF.
+# Relay 1/2 controls left window open/close.
+# Relay 3/4 controls right window open/close.
+script:
+  pump_timer_start:
+    alias: Pump Timer Start
+    mode: restart
+    variables:
+      pump_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_5") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_5
+        {% else %}
+          switch.a8s_out_5
+        {% endif %}
+      pump_minutes: >
+        {% set raw = states('input_number.pump_timer_minutes') | float(1) | int %}
+        {% if raw < 1 %}
+          1
+        {% elif raw > 120 %}
+          120
+        {% else %}
+          {{ raw }}
+        {% endif %}
+    sequence:
+      - service: timer.cancel
+        target:
+          entity_id: timer.pump_timer
+      - service: switch.turn_on
+        data:
+          entity_id: "{{ pump_entity | trim }}"
+      - service: timer.start
+        target:
+          entity_id: timer.pump_timer
+        data:
+          duration: >
+            {% set total = pump_minutes | int %}
+            {% set hours = total // 60 %}
+            {% set minutes = total % 60 %}
+            {{ '%02d:%02d:00' | format(hours, minutes) }}
+
+  pump_timer_stop:
+    alias: Pump Timer Stop
+    mode: restart
+    variables:
+      pump_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_5") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_5
+        {% else %}
+          switch.a8s_out_5
+        {% endif %}
+    sequence:
+      - service: timer.cancel
+        target:
+          entity_id: timer.pump_timer
+      - service: switch.turn_off
+        data:
+          entity_id: "{{ pump_entity | trim }}"
+
+  left_window_open:
+    alias: Left Window Open
+    mode: restart
+    variables:
+      open_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_1") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_1
+        {% else %}
+          switch.a8s_out_1
+        {% endif %}
+      close_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_2") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_2
+        {% else %}
+          switch.a8s_out_2
+        {% endif %}
+    sequence:
+      - service: switch.turn_off
+        data:
+          entity_id: "{{ close_entity | trim }}"
+      - service: switch.toggle
+        data:
+          entity_id: "{{ open_entity | trim }}"
+
+  left_window_close:
+    alias: Left Window Close
+    mode: restart
+    variables:
+      open_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_1") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_1
+        {% else %}
+          switch.a8s_out_1
+        {% endif %}
+      close_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_2") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_2
+        {% else %}
+          switch.a8s_out_2
+        {% endif %}
+    sequence:
+      - service: switch.turn_off
+        data:
+          entity_id: "{{ open_entity | trim }}"
+      - service: switch.toggle
+        data:
+          entity_id: "{{ close_entity | trim }}"
+
+  right_window_open:
+    alias: Right Window Open
+    mode: restart
+    variables:
+      open_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_3") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_3
+        {% else %}
+          switch.a8s_out_3
+        {% endif %}
+      close_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_4") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_4
+        {% else %}
+          switch.a8s_out_4
+        {% endif %}
+    sequence:
+      - service: switch.turn_off
+        data:
+          entity_id: "{{ close_entity | trim }}"
+      - service: switch.toggle
+        data:
+          entity_id: "{{ open_entity | trim }}"
+
+  right_window_close:
+    alias: Right Window Close
+    mode: restart
+    variables:
+      open_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_3") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_3
+        {% else %}
+          switch.a8s_out_3
+        {% endif %}
+      close_entity: >
+        {% if states("switch.kc868_a8s_a8s_out_4") not in ["unknown", "unavailable", "none"] %}
+          switch.kc868_a8s_a8s_out_4
+        {% else %}
+          switch.a8s_out_4
+        {% endif %}
+    sequence:
+      - service: switch.turn_off
+        data:
+          entity_id: "{{ open_entity | trim }}"
+      - service: switch.toggle
+        data:
+          entity_id: "{{ close_entity | trim }}"
+
+# Pump safety and scheduled watering automations.
+# Each scheduled irrigation copies its duration into pump_timer_minutes,
+# then starts the common pump timer script.
+automation:
+  - id: pump_timer_finished_stop_pump
+    alias: Pump Timer Finished Stop Pump
+    mode: single
+    trigger:
+      - platform: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.pump_timer
+    action:
+      - service: script.pump_timer_stop
+
+  - id: pump_timer_cancel_when_pump_manual_off
+    alias: Pump Timer Cancel When Pump Manual Off
+    mode: single
+    trigger:
+      - platform: state
+        entity_id:
+          - switch.kc868_a8s_a8s_out_5
+          - switch.a8s_out_5
+        from: "on"
+        to: "off"
+    condition:
+      - condition: state
+        entity_id: timer.pump_timer
+        state: active
+    action:
+      - service: timer.cancel
+        target:
+          entity_id: timer.pump_timer
+
+  - id: pump_runtime_alert_every_10_minutes
+    alias: 알림 - 펌프 10분 단위 동작 알림
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: switch.kc868_a8s_a8s_out_5
+        from: "off"
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pump_runtime_alert_enabled
+        state: "on"
+    action:
+      - service: persistent_notification.create
+        data:
+          title: "스마트팜 펌프"
+          message: "펌프가 동작 중입니다."
+      - service: notify.mobile_app_iphone
+        data:
+          title: "스마트팜 펌프"
+          message: "펌프가 동작 중입니다."
+      - repeat:
+          while:
+            - condition: state
+              entity_id: switch.kc868_a8s_a8s_out_5
+              state: "on"
+          sequence:
+            - delay: "00:10:00"
+            - condition: state
+              entity_id: switch.kc868_a8s_a8s_out_5
+              state: "on"
+            - service: persistent_notification.create
+              data:
+                title: "스마트팜 펌프"
+                message: >
+                  펌프가 {{ ((as_timestamp(now()) - as_timestamp(states.switch.kc868_a8s_a8s_out_5.last_changed)) / 60) | int }}분 동작했습니다.
+            - service: notify.mobile_app_iphone
+              data:
+                title: "스마트팜 펌프"
+                message: >
+                  펌프가 {{ ((as_timestamp(now()) - as_timestamp(states.switch.kc868_a8s_a8s_out_5.last_changed)) / 60) | int }}분 동작했습니다.
+
+  - id: pump_runtime_alert_finished
+    alias: 알림 - 펌프 동작 종료
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: switch.kc868_a8s_a8s_out_5
+        from: "on"
+        to: "off"
+    condition:
+      - condition: state
+        entity_id: input_boolean.pump_runtime_alert_enabled
+        state: "on"
+    action:
+      - service: persistent_notification.create
+        data:
+          title: "스마트팜 펌프"
+          message: >
+            펌프 동작이 종료되었습니다.
+            총 동작 시간: {{ ((as_timestamp(now()) - as_timestamp(trigger.from_state.last_changed)) / 60) | int }}분
+      - service: notify.mobile_app_iphone
+        data:
+          title: "스마트팜 펌프"
+          message: >
+            펌프 동작이 종료되었습니다.
+            총 동작 시간: {{ ((as_timestamp(now()) - as_timestamp(trigger.from_state.last_changed)) / 60) | int }}분
+
+  - id: scheduled_irrigation_1_start
+    alias: 예약 관수 1 시작
+    mode: single
+    trigger:
+      - platform: time
+        at: input_datetime.irrigation_1_start_time
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_1_schedule_enabled
+        state: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pump_timer_minutes
+        data:
+          value: "{{ states('input_number.irrigation_1_duration_minutes') | float(1) | int }}"
+      - service: script.pump_timer_start
+
+  - id: scheduled_irrigation_2_start
+    alias: 예약 관수 2 시작
+    mode: single
+    trigger:
+      - platform: time
+        at: input_datetime.irrigation_2_start_time
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_2_schedule_enabled
+        state: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pump_timer_minutes
+        data:
+          value: "{{ states('input_number.irrigation_2_duration_minutes') | float(1) | int }}"
+      - service: script.pump_timer_start
+
+  - id: scheduled_irrigation_3_start
+    alias: 예약 관수 3 시작
+    mode: single
+    trigger:
+      - platform: time
+        at: input_datetime.irrigation_3_start_time
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_3_schedule_enabled
+        state: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pump_timer_minutes
+        data:
+          value: "{{ states('input_number.irrigation_3_duration_minutes') | float(1) | int }}"
+      - service: script.pump_timer_start
+
+  - id: scheduled_irrigation_4_start
+    alias: 예약 관수 4 시작
+    mode: single
+    trigger:
+      - platform: time
+        at: input_datetime.irrigation_4_start_time
+    condition:
+      - condition: state
+        entity_id: input_boolean.irrigation_4_schedule_enabled
+        state: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.pump_timer_minutes
+        data:
+          value: "{{ states('input_number.irrigation_4_duration_minutes') | float(1) | int }}"
+      - service: script.pump_timer_start
+
+# Dashboard/display sensor for pump timer remaining.
+# Also defines representative air temperature/humidity sensors for dashboards.
+template:
+  - sensor:
+      - name: Representative Air Temperature
+        unique_id: representative_air_temperature
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {% set selected = states("input_select.representative_air_sensor") %}
+          {% set sensors = {
+            "Autonics": "sensor.kc868_a8s_autonics_temperature",
+            "CWT": "sensor.kc868_a8s_cwt_temperature"
+          } %}
+          {% if selected in sensors %}
+            {% set v = states(sensors[selected]) %}
+            {{ v if v not in ["unknown", "unavailable", "none"] else "unknown" }}
+          {% else %}
+            {% set ns = namespace(v="unknown") %}
+            {% for name, entity in sensors.items() %}
+              {% set v = states(entity) %}
+              {% if ns.v == "unknown" and v not in ["unknown", "unavailable", "none"] %}
+                {% set ns.v = v %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.v }}
+          {% endif %}
+
+      - name: Representative Air Humidity
+        unique_id: representative_air_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        state: >
+          {% set selected = states("input_select.representative_air_sensor") %}
+          {% set sensors = {
+            "Autonics": "sensor.kc868_a8s_autonics_humidity",
+            "CWT": "sensor.kc868_a8s_cwt_humidity"
+          } %}
+          {% if selected in sensors %}
+            {% set v = states(sensors[selected]) %}
+            {{ v if v not in ["unknown", "unavailable", "none"] else "unknown" }}
+          {% else %}
+            {% set ns = namespace(v="unknown") %}
+            {% for name, entity in sensors.items() %}
+              {% set v = states(entity) %}
+              {% if ns.v == "unknown" and v not in ["unknown", "unavailable", "none"] %}
+                {% set ns.v = v %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.v }}
+          {% endif %}
+
+  # Shows HH:MM:SS while active and configured minutes while idle.
+  - trigger:
+      - platform: time_pattern
+        seconds: "/1"
+      - platform: state
+        entity_id:
+          - timer.pump_timer
+          - input_number.pump_timer_minutes
+    sensor:
+      - name: Pump Timer Remaining
+        unique_id: pump_timer_remaining
+        icon: mdi:timer-outline
+        state: >
+          {% if is_state("timer.pump_timer", "active") %}
+            {% set finish = state_attr("timer.pump_timer", "finishes_at") %}
+            {% set left = [0, (as_timestamp(finish) - as_timestamp(now())) | int(0)] | max %}
+            {% set h = left // 3600 %}
+            {% set m = (left % 3600) // 60 %}
+            {% set s = left % 60 %}
+            {{ '%02d:%02d:%02d' | format(h, m, s) }}
+          {% else %}
+            {{ states("input_number.pump_timer_minutes") | float(1) | int }} min
+          {% endif %}

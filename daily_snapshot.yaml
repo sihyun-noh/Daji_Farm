@@ -1,0 +1,18 @@
+script:
+  smartfarm_snapshot_upload_test:
+    alias: Smart Farm Snapshot Upload Test
+    mode: single
+    sequence:
+      - service: camera.snapshot
+        target:
+          entity_id: camera.tc71_sd_stream
+        data:
+          filename: "/config/www/snapshots/site01_report.jpg"
+      - delay: "00:00:02"
+      - service: shell_command.upload_smartfarm_snapshot
+      
+shell_command:
+  upload_smartfarm_snapshot: >
+    curl -X POST
+    -F "snapshot=@/config/www/snapshots/site01_report.jpg"
+    http://115.143.224.16:11880/smartfarm/site01/snapshot

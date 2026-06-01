@@ -1,0 +1,31 @@
+# Home Assistant runtime DB/log
+home-assistant_v2.db*
+home-assistant.log*
+home-assistant.log.fault
+OZW_Log.txt
+
+# secrets / tokens / keys
+secrets.yaml
+.cloud/
+.storage/
+*.pem
+*.key
+*.crt
+
+# backups
+backups/
+backup/
+*.tar
+*.zip
+
+# generated/cache
+deps/
+tts/
+www/community/
+__pycache__/
+*.pyc
+
+# ESPHome build files
+esphome/.esphome/
+esphome/**/.pioenvs/
+esphome/**/.piolibdeps/
